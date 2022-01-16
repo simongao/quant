@@ -22,8 +22,8 @@ class BOLLStrat(bt.Strategy):
     def __init__(self):
         self.boll = bt.indicators.BollingerBands(period=self.p.period,
                                                  devfactor=self.p.devfactor)
-        #self.sx = bt.indicators.CrossDown(self.data.close, self.boll.lines.top)
-        #self.lx = bt.indicators.CrossUp(self.data.close, self.boll.lines.bot)
+        # self.sx = bt.indicators.CrossDown(self.data.close, self.boll.lines.top)
+        # self.lx = bt.indicators.CrossUp(self.data.close, self.boll.lines.bot)
 
     def next(self):
 
