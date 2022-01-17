@@ -17,7 +17,7 @@ class BOLLStrat(bt.Strategy):
         - Long/Short: Price touching the median line
     '''
 
-    params = (("period", 20), ("devfactor", 2), ("size", 100), ("debug", False), ("stop", 0.95))
+    params = (("period", 20), ("devfactor", 2), ("size", 100), ("debug", False), ("take_profit", 2.0), ("stop_loss", 0.95))
 
     def __init__(self):
         self.boll = bt.indicators.BollingerBands(period=self.p.period,
@@ -30,8 +30,9 @@ class BOLLStrat(bt.Strategy):
         if not self.position:
 
             if (self.data.close < self.boll.bot):
-                self.buy(exectype=bt.Order.Limit,
+                self.buy_bracket(limitprice=self.p.take_profit * self.boll.lines.bot,
                          price=self.boll.lines.bot,
+                         stopprice=self.p.stop_loss * self.boll.lines.bot,
                          size=self.p.size)
 
         else:
@@ -42,11 +43,9 @@ class BOLLStrat(bt.Strategy):
                           size=self.p.size)
 
             if (self.data.close < self.boll.bot) and (self.broker.get_fundvalue() >= self.p.size*self.boll.lines.bot):
-                self.buy(exectype=bt.Order.Limit,
+                self.buy_bracket(limitprice=self.p.take_profit * self.boll.lines.bot,
                          price=self.boll.lines.bot,
-                         size=self.p.size)
-                self.sell(exectype=bt.Order.Stop,
-                         price=self.p.stop * self.boll.lines.bot[0],
+                         stopprice=self.p.stop_loss * self.boll.lines.bot,
                          size=self.p.size)
 
         if self.p.debug:
