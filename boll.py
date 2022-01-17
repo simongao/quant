@@ -17,7 +17,7 @@ class BOLLStrat(bt.Strategy):
         - Long/Short: Price touching the median line
     '''
 
-    params = (("period", 20), ("devfactor", 2), ("size", 20), ("debug", False))
+    params = (("period", 20), ("devfactor", 2), ("size", 100), ("debug", False))
 
     def __init__(self):
         self.boll = bt.indicators.BollingerBands(period=self.p.period,
@@ -130,7 +130,7 @@ data = bt.feeds.GenericCSVData(dataname='601318.csv',
 cerebro.adddata(data)
 
 # Add a sizer
-cerebro.addsizer(bt.sizers.FixedReverser, stake=10)
+cerebro.addsizer(bt.sizers.FixedReverser, stake=100)
 
 # Run over everything
 cerebro.run()
