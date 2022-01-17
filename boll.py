@@ -17,46 +17,36 @@ class BOLLStrat(bt.Strategy):
         - Long/Short: Price touching the median line
     '''
 
-    params = (("period", 20), ("devfactor", 2), ("size", 100), ("debug", False))
+    params = (("period", 20), ("devfactor", 2), ("size", 100), ("debug", False), ("stop", 0.95))
 
     def __init__(self):
         self.boll = bt.indicators.BollingerBands(period=self.p.period,
                                                  devfactor=self.p.devfactor)
-        # self.sx = bt.indicators.CrossDown(self.data.close, self.boll.lines.top)
-        # self.lx = bt.indicators.CrossUp(self.data.close, self.boll.lines.bot)
+
 
     def next(self):
 
-        orders = self.broker.get_orders_open()
-
-        # Cancel open orders so we can track the median line
-        if orders:
-            for order in orders:
-                self.broker.cancel(order)
 
         if not self.position:
 
-            if self.data.close > self.boll.lines.top:
-
-                self.sell(exectype=bt.Order.Stop,
-                          price=self.boll.lines.top[0],
-                          size=self.p.size)
-
-            if self.data.close < self.boll.lines.bot:
-                self.buy(exectype=bt.Order.Stop,
-                         price=self.boll.lines.bot[0],
+            if (self.data.close < self.boll.bot):
+                self.buy(exectype=bt.Order.Limit,
+                         price=self.boll.lines.bot,
                          size=self.p.size)
 
         else:
 
-            if self.position.size > 0:
+            if (self.data.close > self.boll.top) and (self.position.size >= self.p.size):
                 self.sell(exectype=bt.Order.Limit,
-                          price=self.boll.lines.mid[0],
+                          price=self.boll.lines.top,
                           size=self.p.size)
 
-            else:
+            if (self.data.close < self.boll.bot) and (self.broker.get_fundvalue() >= self.p.size*self.boll.lines.bot):
                 self.buy(exectype=bt.Order.Limit,
-                         price=self.boll.lines.mid[0],
+                         price=self.boll.lines.bot,
+                         size=self.p.size)
+                self.sell(exectype=bt.Order.Stop,
+                         price=self.p.stop * self.boll.lines.bot[0],
                          size=self.p.size)
 
         if self.p.debug:
@@ -107,7 +97,7 @@ class BOLLStrat(bt.Strategy):
             )
 
 
-#Variable for our starting cash
+# Variable for our starting cash
 startcash = 10000
 
 # Create an instance of cerebro
@@ -135,11 +125,11 @@ cerebro.addsizer(bt.sizers.FixedReverser, stake=100)
 # Run over everything
 cerebro.run()
 
-#Get final portfolio Value
+# Get final portfolio Value
 portvalue = cerebro.broker.getvalue()
 pnl = portvalue - startcash
 
-#Print out the final result
+# Print out the final result
 print('Final Portfolio Value: ${}'.format(round(portvalue, 2)))
 print('P/L: ${}'.format(round(pnl, 2)))
 
