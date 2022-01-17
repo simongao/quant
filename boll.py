@@ -34,6 +34,7 @@ class BOLLStrat(bt.Strategy):
                          price=self.boll.lines.bot,
                          stopprice=self.p.stop_loss * self.boll.lines.bot,
                          size=self.p.size)
+            
 
         else:
 
@@ -42,7 +43,7 @@ class BOLLStrat(bt.Strategy):
                           price=self.boll.lines.top,
                           size=self.p.size)
 
-            if (self.data.close < self.boll.bot) and (self.broker.get_fundvalue() >= self.p.size*self.boll.lines.bot):
+            if (self.data.close < self.boll.bot) and (self.broker.get_cash() >= self.p.size*self.boll.lines.bot):
                 self.buy_bracket(limitprice=self.p.take_profit * self.boll.lines.bot,
                          price=self.boll.lines.bot,
                          stopprice=self.p.stop_loss * self.boll.lines.bot,
@@ -120,6 +121,9 @@ cerebro.adddata(data)
 
 # Add a sizer
 cerebro.addsizer(bt.sizers.FixedReverser, stake=100)
+
+# Set our desired cash start
+cerebro.broker.set_cash(startcash)
 
 # Run over everything
 cerebro.run()
