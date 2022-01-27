@@ -23,6 +23,9 @@ class BOLLStrat(bt.Strategy):
         self.boll = bt.indicators.BollingerBands(period=self.p.period,
                                                  devfactor=self.p.devfactor)
 
+    def log(self, txt, dt=None):
+        dt = dt or self.datas[0].datetime.date(0)
+        print('%s, %s' % (dt.isoformat(), txt))
 
     def next(self):
         if not self.position:
@@ -32,18 +35,25 @@ class BOLLStrat(bt.Strategy):
                          price=self.boll.lines.bot,
                          stopprice=self.p.stop_loss * self.boll.lines.bot,
                          size=self.p.size)
+            self.log("Buy Order: Buy %.0f stocks at %.2f." % (self.p.size, self.boll.lines.bot[0]))
+            self.log("Take Profit Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.take_profit * self.boll.lines.bot[0]))
+            self.log("Stop Loss Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.stop_loss * self.boll.lines.bot[0]))
 
         else:
             if (self.data.close > self.boll.top) and (self.position.size >= self.p.size):
                 self.sell(exectype=bt.Order.Limit,
                           price=self.boll.lines.top,
                           size=self.p.size)
+                self.log("Sell Order: Sell %.0f stocks at %.2f." % (self.p.size, self.boll.lines.top[0]))
 
             if (self.data.close < self.boll.bot) and (self.broker.get_cash() >= self.p.size*self.boll.lines.bot):
                 self.buy_bracket(limitprice=self.p.take_profit * self.boll.lines.bot,
                          price=self.boll.lines.bot,
                          stopprice=self.p.stop_loss * self.boll.lines.bot,
                          size=self.p.size)
+                self.log("Buy Order: Buy %.0f stocks at %.2f." % (self.p.size, self.boll.lines.bot[0]))
+                self.log("Take Profit Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.take_profit * self.boll.lines.bot[0]))
+                self.log("Stop Loss Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.stop_loss * self.boll.lines.bot[0]))
 
         if self.p.debug:
             print(
