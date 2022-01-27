@@ -17,7 +17,7 @@ class BOLLStrat(bt.Strategy):
         - Long/Short: Price touching the median line
     '''
 
-    params = (("period", 20), ("devfactor", 2), ("size", 100), ("debug", False), ("take_profit", 2.0), ("stop_loss", 0.95))
+    params = (("period", 20), ("devfactor", 2), ("size", 100), ("debug", False), ("take_profit", 2.0), ("stop_loss", 0.95)) 
 
     def __init__(self):
         self.boll = bt.indicators.BollingerBands(period=self.p.period,
@@ -25,8 +25,6 @@ class BOLLStrat(bt.Strategy):
 
 
     def next(self):
-
-
         if not self.position:
 
             if (self.data.close < self.boll.bot):
@@ -34,10 +32,8 @@ class BOLLStrat(bt.Strategy):
                          price=self.boll.lines.bot,
                          stopprice=self.p.stop_loss * self.boll.lines.bot,
                          size=self.p.size)
-            
 
         else:
-
             if (self.data.close > self.boll.top) and (self.position.size >= self.p.size):
                 self.sell(exectype=bt.Order.Limit,
                           price=self.boll.lines.top,
@@ -137,4 +133,8 @@ print('Final Portfolio Value: ${}'.format(round(portvalue, 2)))
 print('P/L: ${}'.format(round(pnl, 2)))
 
 # Finally plot the end results
-cerebro.plot(style='candlestick')
+cerebro.plot(style='candlestick',
+            bardown='green',
+            barup='red',
+            barupfill=False,
+            bardownfill=True)
