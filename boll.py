@@ -17,7 +17,7 @@ class BOLLStrat(bt.Strategy):
         - Long/Short: Price touching the median line
     '''
 
-    params = (("period", 20), ("devfactor", 2), ("size", 100), ("debug", False), ("take_profit", 2.0), ("stop_loss", 0.95)) 
+    params = (("period", 20), ("devfactor", 2), ("size", 100), ("debug", False), ("take_profit", 30.0), ("stop_loss", 0.95)) 
 
     def __init__(self):
         self.boll = bt.indicators.BollingerBands(period=self.p.period,
@@ -35,25 +35,25 @@ class BOLLStrat(bt.Strategy):
                          price=self.boll.lines.bot,
                          stopprice=self.p.stop_loss * self.boll.lines.bot,
                          size=self.p.size)
-            self.log("Buy Order: Buy %.0f stocks at %.2f." % (self.p.size, self.boll.lines.bot[0]))
-            self.log("Take Profit Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.take_profit * self.boll.lines.bot[0]))
-            self.log("Stop Loss Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.stop_loss * self.boll.lines.bot[0]))
+            # self.log("Buy Order: Buy %.0f stocks at %.2f." % (self.p.size, self.boll.lines.bot[0]))
+            # self.log("Take Profit Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.take_profit * self.boll.lines.bot[0]))
+            # self.log("Stop Loss Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.stop_loss * self.boll.lines.bot[0]))
 
         else:
             if (self.data.close > self.boll.top) and (self.position.size >= self.p.size):
                 self.sell(exectype=bt.Order.Limit,
                           price=self.boll.lines.top,
                           size=self.p.size)
-                self.log("Sell Order: Sell %.0f stocks at %.2f." % (self.p.size, self.boll.lines.top[0]))
+                # self.log("Sell Order: Sell %.0f stocks at %.2f." % (self.p.size, self.boll.lines.top[0]))
 
             if (self.data.close < self.boll.bot) and (self.broker.get_cash() >= self.p.size*self.boll.lines.bot):
                 self.buy_bracket(limitprice=self.p.take_profit * self.boll.lines.bot,
                          price=self.boll.lines.bot,
                          stopprice=self.p.stop_loss * self.boll.lines.bot,
                          size=self.p.size)
-                self.log("Buy Order: Buy %.0f stocks at %.2f." % (self.p.size, self.boll.lines.bot[0]))
-                self.log("Take Profit Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.take_profit * self.boll.lines.bot[0]))
-                self.log("Stop Loss Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.stop_loss * self.boll.lines.bot[0]))
+                # self.log("Buy Order: Buy %.0f stocks at %.2f." % (self.p.size, self.boll.lines.bot[0]))
+                # self.log("Take Profit Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.take_profit * self.boll.lines.bot[0]))
+                # self.log("Stop Loss Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.stop_loss * self.boll.lines.bot[0]))
 
         if self.p.debug:
             print(
@@ -80,6 +80,34 @@ class BOLLStrat(bt.Strategy):
             print(
                 '--------------------------------------------------------------------'
             )
+
+    def notify_order(self, order):
+        if order.status in [order.Submitted, order.Accepted]:
+            # Buy/Sell order submitted/accepted to/by broker - Nothing to do
+            return
+
+        # Check if an order has been completed
+        # Attention: broker could reject order if not enough cash
+        if order.status in [order.Completed]:
+            if order.isbuy():
+                self.log('BUY EXECUTED, Price: %.2f, Shares: %.0f, Cost: %.2f, Comm %.2f' %
+                         (order.executed.price, order.excuted.size, order.executed.value,
+                          order.executed.comm))
+
+                self.buyprice = order.executed.price
+                self.buycomm = order.executed.comm
+            else:  # Sell
+                self.log('SELL EXECUTED, Price: %.2f, Shares: %.0f, Cost: %.2f, Comm %.2f' %
+                         (order.executed.price, order.excuted.size, order.executed.value,
+                          order.executed.comm))
+
+            self.bar_executed = len(self)
+
+        elif order.status in [order.Canceled, order.Margin, order.Rejected]:
+            self.log(order.status)
+
+        # Write down: no pending order
+        self.order = None
 
     def notify_trade(self, trade):
         if trade.isclosed:
