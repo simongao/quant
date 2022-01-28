@@ -91,20 +91,20 @@ class BOLLStrat(bt.Strategy):
         if order.status in [order.Completed]:
             if order.isbuy():
                 self.log('BUY EXECUTED, Price: %.2f, Shares: %.0f, Cost: %.2f, Comm %.2f' %
-                         (order.executed.price, order.excuted.size, order.executed.value,
+                         (order.executed.price, order.executed.size, order.executed.value,
                           order.executed.comm))
 
                 self.buyprice = order.executed.price
                 self.buycomm = order.executed.comm
             else:  # Sell
                 self.log('SELL EXECUTED, Price: %.2f, Shares: %.0f, Cost: %.2f, Comm %.2f' %
-                         (order.executed.price, order.excuted.size, order.executed.value,
+                         (order.executed.price, order.executed.size, order.executed.value,
                           order.executed.comm))
 
             self.bar_executed = len(self)
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
-            self.log(order.status)
+            self.log("Order Canceled/Margin/Rejected")
 
         # Write down: no pending order
         self.order = None
