@@ -29,6 +29,8 @@ class BOLLStrat(bt.Strategy):
     def __init__(self):
         self.boll = bt.indicators.BollingerBands(period=self.p.period,
                                                  devfactor=self.p.devfactor)
+        self.stop_orders = []
+        self.buy_orders = []
 
     def log(self, txt, dt=None):
         dt = dt or self.datas[0].datetime.date(0)
@@ -36,54 +38,30 @@ class BOLLStrat(bt.Strategy):
 
     def next(self):
         if not self.position:
-
             if (self.data.close < self.boll.bot):
                 size = round((self.broker.getcash() / data.close[0] / 100)) * 100
                 if (size > 0):
-                    self.buy(size=size)
+                    self.buy_order = self.buy(size=size)
+                    self.buy_orders.append(self.buy_order)
                     # self.buy_bracket(limitprice=self.p.take_profit * self.boll.lines.bot,
                     #         price=self.boll.lines.bot,
                     #         stopprice=self.p.stop_loss * self.boll.lines.bot,
                     #         size=size)
 
         else:
+            for self.bo in self.buy_orders:
+                if (self.data.close[0] < self.bo.executed.price * 0.95):
+                    self.sell(size=min(self.bo.executed.size, self.position.size))
+                    self.buy_orders.remove(self.bo)
+
             if (self.data.close > self.boll.top) and (self.position.size >= 0):
-                self.sell(size=self.position.size)
+                self.close()
 
             if (self.data.close < self.boll.bot) and (self.broker.get_cash() >= self.p.size*self.boll.lines.bot):
                 size = round((self.broker.getcash() / data.close[0] / 100)) * 100
                 if (size > 0):
-                    self.buy(size=size)
-                    # self.buy_bracket(limitprice=self.p.take_profit * self.boll.lines.bot,
-                    #         price=self.boll.lines.bot,
-                    #         stopprice=self.p.stop_loss * self.boll.lines.bot,
-                    #         size=size)
-
-        if self.p.debug:
-            print(
-                '---------------------------- NEXT ----------------------------------'
-            )
-            print("1: Data Name:                            {}".format(
-                data._name))
-            print("2: Bar Num:                              {}".format(
-                len(data)))
-            print("3: Current date:                         {}".format(
-                data.datetime.datetime()))
-            print('4: Open:                                 {}'.format(
-                data.open[0]))
-            print('5: High:                                 {}'.format(
-                data.high[0]))
-            print('6: Low:                                  {}'.format(
-                data.low[0]))
-            print('7: Close:                                {}'.format(
-                data.close[0]))
-            print('8: Volume:                               {}'.format(
-                data.volume[0]))
-            print('9: Position Size:                       {}'.format(
-                self.position.size))
-            print(
-                '--------------------------------------------------------------------'
-            )
+                    self.buy_order = self.buy(size=size)
+                    self.buy_orders.append(self.buy_order)
 
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
