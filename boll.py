@@ -3,12 +3,15 @@ from datetime import datetime
 
 
 class AllInOut(bt.Sizer):
+
     def _getsizing(self, comminfo, cash, data, isbuy):
-        if(isbuy):
+        if (isbuy):
             size = round((cash / data.close[0] / 100)) * 100
         else:
             size = self.broker.getposition(data)
-        return size    
+        return size
+
+
 class BOLLStrat(bt.Strategy):
     '''
     This is a simple mean reversion bollinger band strategy.
@@ -24,44 +27,54 @@ class BOLLStrat(bt.Strategy):
         - Long/Short: Price touching the median line
     '''
 
-    params = (("period", 20), ("devfactor", 2), ("size", 100), ("debug", False), ("take_profit", 30.0), ("stop_loss", 0.95)) 
+    params = (("period", 20), ("devfactor", 2), ("size", 100),
+              ("debug", False), ("take_profit", 30.0), ("stop_loss", 0.95))
 
     def __init__(self):
         self.boll = bt.indicators.BollingerBands(period=self.p.period,
                                                  devfactor=self.p.devfactor)
         self.stop_orders = []
         self.buy_orders = []
+        self.order = None
+
 
     def log(self, txt, dt=None):
         dt = dt or self.datas[0].datetime.date(0)
         print('%s, %s' % (dt.isoformat(), txt))
 
     def next(self):
+        # Check if an order is pending ... if yes, we cannot send a 2nd one
+        if self.order:
+            return
+
         if not self.position:
             if (self.data.close < self.boll.bot):
-                size = round((self.broker.getcash() / data.close[0] / 100)) * 100
+                size = round(
+                    (self.broker.getcash() / data.close[0] / 100)) * 100
                 if (size > 0):
                     self.buy_order = self.buy(size=size)
-                    self.buy_orders.append(self.buy_order)
-                    # self.buy_bracket(limitprice=self.p.take_profit * self.boll.lines.bot,
-                    #         price=self.boll.lines.bot,
-                    #         stopprice=self.p.stop_loss * self.boll.lines.bot,
-                    #         size=size)
 
         else:
-            for self.bo in self.buy_orders:
-                if (self.data.close[0] < self.bo.executed.price * 0.95):
-                    self.sell(size=min(self.bo.executed.size, self.position.size))
-                    self.buy_orders.remove(self.bo)
+            # Implement stop loss
+            for buy_order in self.buy_orders:
+                if (self.data.close[0] <
+                        buy_order.executed.price * self.p.stop_loss):
+                    sell_size = min(buy_order.executed.size,
+                                    self.position.size)
+                    self.sell(size=sell_size)
+                    self.log("stop loss %.0f shares" % sell_size)
+                    self.buy_orders.remove(buy_order)
 
             if (self.data.close > self.boll.top) and (self.position.size >= 0):
                 self.close()
 
-            if (self.data.close < self.boll.bot) and (self.broker.get_cash() >= self.p.size*self.boll.lines.bot):
-                size = round((self.broker.getcash() / data.close[0] / 100)) * 100
+            if (self.data.close <
+                    self.boll.bot) and (self.broker.get_cash() >=
+                                        self.p.size * self.boll.lines.bot):
+                size = round(
+                    (self.broker.getcash() / data.close[0] / 100)) * 100
                 if (size > 0):
                     self.buy_order = self.buy(size=size)
-                    self.buy_orders.append(self.buy_order)
 
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
@@ -72,20 +85,30 @@ class BOLLStrat(bt.Strategy):
         # Attention: broker could reject order if not enough cash
         if order.status in [order.Completed]:
             if order.isbuy():
-                self.log('BUY EXECUTED, Price: %.2f, Shares: %.0f, Cash: %.0f, Value %.0f, Position: %.0f' %
-                         (order.executed.price, order.executed.size, self.broker.get_cash(), self.broker.get_value(), self.position.size))
+                self.buy_orders.append(order)
+                self.log(
+                    'BUY EXECUTED, Price: %.2f, Shares: %.0f, Cash: %.0f, Value %.0f, Position: %.0f'
+                    % (order.executed.price, order.executed.size,
+                       self.broker.get_cash(), self.broker.get_value(),
+                       self.position.size))
 
-                self.buyprice = order.executed.price
-                self.buycomm = order.executed.comm
+                # self.buyprice = order.executed.price
+                # self.buycomm = order.executed.comm
             else:  # Sell
-                self.log('SELL EXECUTED, Price: %.2f, Shares: %.0f, Cash: %.0f, Value %.0f, Position: %.0f' %
-                         (order.executed.price, order.executed.size, self.broker.get_cash(), self.broker.get_value(), self.position.size))
+                self.log(
+                    'SELL EXECUTED, Price: %.2f, Shares: %.0f, Cash: %.0f, Value %.0f, Position: %.0f'
+                    % (order.executed.price, order.executed.size,
+                       self.broker.get_cash(), self.broker.get_value(),
+                       self.position.size))
 
-            self.bar_executed = len(self)
+            # self.bar_executed = len(self)
 
-        elif order.status in [order.Canceled, order.Margin, order.Rejected]:
-            # self.log("Order Canceled/Margin/Rejected")
-            pass
+        if order.status in [order.Canceled]:
+            self.log("Order Canceled")
+        if order.status in [order.Margin]:
+            self.log("Order Margin")
+        if order.status in [order.Rejected]:
+            self.log("Order Rejected")
 
         # Write down: no pending order
         self.order = None
@@ -94,22 +117,22 @@ class BOLLStrat(bt.Strategy):
         if trade.isclosed:
             dt = self.data.datetime.date()
 
-            print(
-                '---------------------------- TRADE ---------------------------------'
-            )
-            print("1: Data Name:                            {}".format(
-                trade.data._name))
-            print("2: Bar Num:                              {}".format(
-                len(trade.data)))
-            print("3: Current date:                         {}".format(dt))
-            print('4: Status:                               Trade Complete')
-            print('5: Ref:                                  {}'.format(
-                trade.ref))
-            print('6: PnL:                                  {}'.format(
-                round(trade.pnl, 2)))
-            print(
-                '--------------------------------------------------------------------'
-            )
+            # print(
+            #     '---------------------------- TRADE ---------------------------------'
+            # )
+            # print("1: Data Name:                            {}".format(
+            #     trade.data._name))
+            # print("2: Bar Num:                              {}".format(
+            #     len(trade.data)))
+            # print("3: Current date:                         {}".format(dt))
+            # print('4: Status:                               Trade Complete')
+            # print('5: Ref:                                  {}'.format(
+            #     trade.ref))
+            # print('6: PnL:                                  {}'.format(
+            #     round(trade.pnl, 2)))
+            # print(
+            #     '--------------------------------------------------------------------'
+            # )
 
 
 # Variable for our starting cash
@@ -122,14 +145,14 @@ cerebro = bt.Cerebro()
 cerebro.addstrategy(BOLLStrat)
 
 data = bt.feeds.GenericCSVData(dataname='601318.csv',
-                                dtformat=('%Y-%m-%d'),
-                                datetime=0,
-                                open=1,
-                                high=2,
-                                low=3,
-                                close=4,
-                                volumn=5,
-                                openinterest=6)
+                               dtformat=('%Y-%m-%d'),
+                               datetime=0,
+                               open=1,
+                               high=2,
+                               low=3,
+                               close=4,
+                               volumn=5,
+                               openinterest=6)
 
 # Add the data to Cerebro
 cerebro.adddata(data)
@@ -153,7 +176,7 @@ print('P/L: ${}'.format(round(pnl, 2)))
 
 # Finally plot the end results
 cerebro.plot(style='candlestick',
-            bardown='green',
-            barup='red',
-            barupfill=False,
-            bardownfill=True)
+             bardown='green',
+             barup='red',
+             barupfill=False,
+             bardownfill=True)
