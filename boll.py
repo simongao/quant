@@ -2,6 +2,13 @@ import backtrader as bt
 from datetime import datetime
 
 
+class AllInOut(bt.Sizer):
+    def _getsizing(self, comminfo, cash, data, isbuy):
+        if(isbuy):
+            size = round((cash / data.close[0] / 100)) * 100
+        else:
+            size = self.broker.getposition(data)
+        return size    
 class BOLLStrat(bt.Strategy):
     '''
     This is a simple mean reversion bollinger band strategy.
@@ -31,29 +38,26 @@ class BOLLStrat(bt.Strategy):
         if not self.position:
 
             if (self.data.close < self.boll.bot):
-                self.buy_bracket(limitprice=self.p.take_profit * self.boll.lines.bot,
-                         price=self.boll.lines.bot,
-                         stopprice=self.p.stop_loss * self.boll.lines.bot,
-                         size=self.p.size)
-            # self.log("Buy Order: Buy %.0f stocks at %.2f." % (self.p.size, self.boll.lines.bot[0]))
-            # self.log("Take Profit Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.take_profit * self.boll.lines.bot[0]))
-            # self.log("Stop Loss Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.stop_loss * self.boll.lines.bot[0]))
+                size = round((self.broker.getcash() / data.close[0] / 100)) * 100
+                if (size > 0):
+                    self.buy(size=size)
+                    # self.buy_bracket(limitprice=self.p.take_profit * self.boll.lines.bot,
+                    #         price=self.boll.lines.bot,
+                    #         stopprice=self.p.stop_loss * self.boll.lines.bot,
+                    #         size=size)
 
         else:
-            if (self.data.close > self.boll.top) and (self.position.size >= self.p.size):
-                self.sell(exectype=bt.Order.Limit,
-                          price=self.boll.lines.top,
-                          size=self.p.size)
-                # self.log("Sell Order: Sell %.0f stocks at %.2f." % (self.p.size, self.boll.lines.top[0]))
+            if (self.data.close > self.boll.top) and (self.position.size >= 0):
+                self.sell(size=self.position.size)
 
             if (self.data.close < self.boll.bot) and (self.broker.get_cash() >= self.p.size*self.boll.lines.bot):
-                self.buy_bracket(limitprice=self.p.take_profit * self.boll.lines.bot,
-                         price=self.boll.lines.bot,
-                         stopprice=self.p.stop_loss * self.boll.lines.bot,
-                         size=self.p.size)
-                # self.log("Buy Order: Buy %.0f stocks at %.2f." % (self.p.size, self.boll.lines.bot[0]))
-                # self.log("Take Profit Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.take_profit * self.boll.lines.bot[0]))
-                # self.log("Stop Loss Order: Sell %.0f stocks at %.2f." % (self.p.size, self.p.stop_loss * self.boll.lines.bot[0]))
+                size = round((self.broker.getcash() / data.close[0] / 100)) * 100
+                if (size > 0):
+                    self.buy(size=size)
+                    # self.buy_bracket(limitprice=self.p.take_profit * self.boll.lines.bot,
+                    #         price=self.boll.lines.bot,
+                    #         stopprice=self.p.stop_loss * self.boll.lines.bot,
+                    #         size=size)
 
         if self.p.debug:
             print(
@@ -90,21 +94,20 @@ class BOLLStrat(bt.Strategy):
         # Attention: broker could reject order if not enough cash
         if order.status in [order.Completed]:
             if order.isbuy():
-                self.log('BUY EXECUTED, Price: %.2f, Shares: %.0f, Cost: %.2f, Comm %.2f' %
-                         (order.executed.price, order.executed.size, order.executed.value,
-                          order.executed.comm))
+                self.log('BUY EXECUTED, Price: %.2f, Shares: %.0f, Cash: %.0f, Value %.0f, Position: %.0f' %
+                         (order.executed.price, order.executed.size, self.broker.get_cash(), self.broker.get_value(), self.position.size))
 
                 self.buyprice = order.executed.price
                 self.buycomm = order.executed.comm
             else:  # Sell
-                self.log('SELL EXECUTED, Price: %.2f, Shares: %.0f, Cost: %.2f, Comm %.2f' %
-                         (order.executed.price, order.executed.size, order.executed.value,
-                          order.executed.comm))
+                self.log('SELL EXECUTED, Price: %.2f, Shares: %.0f, Cash: %.0f, Value %.0f, Position: %.0f' %
+                         (order.executed.price, order.executed.size, self.broker.get_cash(), self.broker.get_value(), self.position.size))
 
             self.bar_executed = len(self)
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
-            self.log("Order Canceled/Margin/Rejected")
+            # self.log("Order Canceled/Margin/Rejected")
+            pass
 
         # Write down: no pending order
         self.order = None
@@ -154,7 +157,7 @@ data = bt.feeds.GenericCSVData(dataname='601318.csv',
 cerebro.adddata(data)
 
 # Add a sizer
-cerebro.addsizer(bt.sizers.FixedReverser, stake=100)
+cerebro.addsizer(AllInOut)
 
 # Set our desired cash start
 cerebro.broker.set_cash(startcash)
