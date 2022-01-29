@@ -37,7 +37,6 @@ class BOLLStrat(bt.Strategy):
         self.buy_orders = []
         self.order = None
 
-
     def log(self, txt, dt=None):
         dt = dt or self.datas[0].datetime.date(0)
         print('%s, %s' % (dt.isoformat(), txt))
@@ -144,7 +143,7 @@ cerebro = bt.Cerebro()
 # Add our strategy
 cerebro.addstrategy(BOLLStrat)
 
-data = bt.feeds.GenericCSVData(dataname='601318.csv',
+data = bt.feeds.GenericCSVData(dataname=os.path.join('.','data','601318_SH.csv'),
                                dtformat=('%Y-%m-%d'),
                                datetime=0,
                                open=1,

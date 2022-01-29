@@ -26,7 +26,7 @@ class St(bt.Strategy):
         enter=[1, 3, 4],  # data ids are 1 based
         hold=[7, 10, 15],  # data ids are 1 based
         usebracket=True,
-        rawbracket=True,
+        rawbracket=False,
         pentry=0.015,
         plimits=0.03,
         valid=10,
@@ -124,7 +124,6 @@ def runstrat(args=None):
             kwargs[d] = datetime.datetime.strptime(a, strpfmt)
 
     # Data feed
-    # data0 = bt.feeds.YahooFinanceCSVData(dataname=args.data0, **kwargs)
     data0 = bt.feeds.GenericCSVData(dataname=os.path.join('.','data','601318_SH.csv'),
                                dtformat=('%Y-%m-%d'),
                                datetime=0,
@@ -136,7 +135,6 @@ def runstrat(args=None):
                                openinterest=6)    
     cerebro.adddata(data0, name='d0')
 
-    # data1 = bt.feeds.YahooFinanceCSVData(dataname=args.data1, **kwargs)
     data1 = bt.feeds.GenericCSVData(dataname=os.path.join('.','data','600079_SH.csv'),
                                dtformat=('%Y-%m-%d'),
                                datetime=0,
@@ -149,7 +147,6 @@ def runstrat(args=None):
     data1.plotinfo.plotmaster = data0
     cerebro.adddata(data1, name='d1')
 
-    # data2 = bt.feeds.YahooFinanceCSVData(dataname=args.data2, **kwargs)
     data2 = bt.feeds.GenericCSVData(dataname=os.path.join('.','data','300676_SZ.csv'),
                                dtformat=('%Y-%m-%d'),
                                datetime=0,
@@ -188,14 +185,14 @@ def parse_args(pargs=None):
         )
     )
 
-    parser.add_argument('--data0', default='../../datas/nvda-1999-2014.txt',
+    parser.add_argument('--data0', default='./data/601318_SH.csv',
                         required=False, help='Data0 to read in')
 
-    parser.add_argument('--data1', default='../../datas/yhoo-1996-2014.txt',
+    parser.add_argument('--data1', default='./data/300676_SZ.csv',
                         required=False, help='Data1 to read in')
 
-    parser.add_argument('--data2', default='../../datas/orcl-1995-2014.txt',
-                        required=False, help='Data1 to read in')
+    parser.add_argument('--data2', default='./data/600079_SH.csv',
+                        required=False, help='Data2 to read in')
 
     # Defaults for dates
     parser.add_argument('--fromdate', required=False, default='2018-01-04',
