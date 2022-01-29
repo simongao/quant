@@ -1,12 +1,14 @@
 import backtrader as bt
 from datetime import datetime
+import os
+import math
 
 
 class AllInOut(bt.Sizer):
 
     def _getsizing(self, comminfo, cash, data, isbuy):
         if (isbuy):
-            size = round((cash / data.close[0] / 100)) * 100
+            size = math.floor((cash / data.close[0] / 100)) * 100
         else:
             size = self.broker.getposition(data)
         return size
@@ -27,8 +29,14 @@ class BOLLStrat(bt.Strategy):
         - Long/Short: Price touching the median line
     '''
 
-    params = (("period", 20), ("devfactor", 2), ("size", 100),
-              ("debug", False), ("take_profit", 30.0), ("stop_loss", 0.95))
+    params = dict(
+                period=20, 
+                devfactor=2, 
+                size=100,
+                debug=False, 
+                take_profit=30.0,
+                stop_loss=0.95,
+                trail_percent=0.05,)
 
     def __init__(self):
         self.boll = bt.indicators.BollingerBands(period=self.p.period,
@@ -48,32 +56,28 @@ class BOLLStrat(bt.Strategy):
 
         if not self.position:
             if (self.data.close < self.boll.bot):
-                size = round(
+                size = math.floor(
                     (self.broker.getcash() / data.close[0] / 100)) * 100
                 if (size > 0):
-                    self.buy_order = self.buy(size=size)
+                    buy_order = self.buy(size=size)
+                    stop_order = self.sell(size=size, exectype=bt.Order.StopTrail, trailpercent=self.p.trail_percent)
+                    self.stop_orders.append(stop_order)
 
-        else:
-            # Implement stop loss
-            for buy_order in self.buy_orders:
-                if (self.data.close[0] <
-                        buy_order.executed.price * self.p.stop_loss):
-                    sell_size = min(buy_order.executed.size,
-                                    self.position.size)
-                    self.sell(size=sell_size)
-                    self.log("stop loss %.0f shares" % sell_size)
-                    self.buy_orders.remove(buy_order)
-
+        else: # in market
             if (self.data.close > self.boll.top) and (self.position.size >= 0):
                 self.close()
+                for stop_order in self.stop_orders:
+                    self.cancel(stop_order)
 
             if (self.data.close <
                     self.boll.bot) and (self.broker.get_cash() >=
                                         self.p.size * self.boll.lines.bot):
-                size = round(
+                size = math.floor(
                     (self.broker.getcash() / data.close[0] / 100)) * 100
                 if (size > 0):
-                    self.buy_order = self.buy(size=size)
+                    buy_order = self.buy(size=size)
+                    stop_order = self.sell(size=size, exectype=bt.Order.StopTrail, trailpercent=self.p.trail_percent)
+                    self.stop_orders.append(stop_order)
 
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
@@ -84,15 +88,12 @@ class BOLLStrat(bt.Strategy):
         # Attention: broker could reject order if not enough cash
         if order.status in [order.Completed]:
             if order.isbuy():
-                self.buy_orders.append(order)
                 self.log(
                     'BUY EXECUTED, Price: %.2f, Shares: %.0f, Cash: %.0f, Value %.0f, Position: %.0f'
                     % (order.executed.price, order.executed.size,
                        self.broker.get_cash(), self.broker.get_value(),
                        self.position.size))
 
-                # self.buyprice = order.executed.price
-                # self.buycomm = order.executed.comm
             else:  # Sell
                 self.log(
                     'SELL EXECUTED, Price: %.2f, Shares: %.0f, Cash: %.0f, Value %.0f, Position: %.0f'
