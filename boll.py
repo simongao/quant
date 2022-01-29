@@ -164,6 +164,7 @@ cerebro.addsizer(AllInOut)
 cerebro.broker.set_cash(startcash)
 
 # Add analyzers
+cerebro.addanalyzer(bt.analyzers.SharpeRatio_A)
 cerebro.addanalyzer(bt.analyzers.SharpeRatio)
 cerebro.addanalyzer(bt.analyzers.DrawDown)
 cerebro.addanalyzer(bt.analyzers.TradeAnalyzer)
@@ -181,6 +182,9 @@ print('Final Portfolio Value: ${}'.format(round(portvalue, 2)))
 print('P/L: ${}'.format(round(pnl, 2)))
 
 # Analyzer results
+sharpe = res.analyzers.sharperatio_a.get_analysis()
+print('Sharpe Ratio: %.2f' % sharpe['sharperatio'])
+
 drawdown = res.analyzers.drawdown.get_analysis()
 print('Max drawdown percent: %.2f' % drawdown['max']['drawdown'])
 print('Max drawdown money: %.0f' % drawdown['max']['moneydown'])
@@ -196,7 +200,7 @@ print('won pnl total: %.0f, avg: %.0f, max: %.0f' %
         tradings['won']['pnl']['max']))
 
 print('========lost========')
-print('lost ratio: %.2f' % (tradings['lost']['total'] / float(tradings['lost']['total'] + tradings['lost']['total'])))
+print('lost ratio: %.2f' % (tradings['lost']['total'] / float(tradings['won']['total'] + tradings['lost']['total'])))
 print('lost hits: %.0f' % tradings['lost']['total'])
 print('lost pnl total: %.0f, avg: %.0f, max: %.0f' % 
         (tradings['lost']['pnl']['total'],

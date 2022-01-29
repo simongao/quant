@@ -141,7 +141,7 @@ if __name__ == '__main__':
     cerebro.adddata(data)
 
     # Set our desired cash start
-    cerebro.broker.setcash(1000.0)
+    cerebro.broker.setcash(10000.0)
 
     # Add a FixedSize sizer according to the stake
     cerebro.addsizer(bt.sizers.FixedSize, stake=10)
@@ -153,17 +153,21 @@ if __name__ == '__main__':
     print('Starting Portfolio Value: %.2f' % cerebro.broker.getvalue())
 
     # Add analyzers
-    cerebro.addanalyzer(bt.analyzers.SharpeRatio)
+    cerebro.addanalyzer(bt.analyzers.SharpeRatio_A)
     cerebro.addanalyzer(bt.analyzers.DrawDown)
     cerebro.addanalyzer(bt.analyzers.TradeAnalyzer)
 
     # Run over everything
     res = cerebro.run()
+    res = res[0]
 
     # Print out the final result
     print('Final Portfolio Value: %.2f' % cerebro.broker.getvalue())
 
     # Analyzer results
+    sharpe = res.analyzers.sharperatio_a.get_analysis()
+    print('Sharpe Ratio: %.2f' % sharpe['sharperatio'])
+
     drawdown = res.analyzers.drawdown.get_analysis()
     print('Max drawdown percent: %.2f' % drawdown['max']['drawdown'])
     print('Max drawdown money: %.0f' % drawdown['max']['moneydown'])
@@ -179,7 +183,7 @@ if __name__ == '__main__':
             tradings['won']['pnl']['max']))
 
     print('========lost=========')
-    print('lost ratio: %.2f' % (tradings['lost']['total'] / float(tradings['lost']['total'] + tradings['lost']['total'])))
+    print('lost ratio: %.2f' % (tradings['lost']['total'] / float(tradings['won']['total'] + tradings['lost']['total'])))
     print('lost hits: %.0f' % tradings['lost']['total'])
     print('lost pnl total: %.0f, avg: %.0f, max: %.0f' % 
             (tradings['lost']['pnl']['total'],
