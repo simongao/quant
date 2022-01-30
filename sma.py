@@ -28,7 +28,7 @@ class TrendIndicator(bt.Indicator):
         self.lines.TrendIndicator[0] = corr.iloc[0][1]
         
 class SMAStrategy(bt.Strategy):
-    params = dict(ma_periods=[3, 5, 10, 20, 60], )
+    params = dict(ma_periods=[3, 5, 10, 20], )
 
     def log(self, txt, dt=None):
         ''' Logging function fot this strategy'''
@@ -114,7 +114,7 @@ class SMAStrategy(bt.Strategy):
         if not self.position:
 
             # Not yet ... we MIGHT BUY if ...
-            if self.buy_signal:
+            if self.buy_signal and self.trend_indicator[0] < 0.0:
                 self.log('BUY CREATE, %.2f' % self.dataclose[0])
 
                 # Keep track of the created order to avoid a 2nd order
