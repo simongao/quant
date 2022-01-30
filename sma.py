@@ -28,7 +28,7 @@ class TrendIndicator(bt.Indicator):
         self.lines.TrendIndicator[0] = corr.iloc[0][1]
         
 class SMAStrategy(bt.Strategy):
-    params = dict(ma_periods=[3, 5, 10, 20], )
+    params = dict(stake=10, )
 
     def log(self, txt, dt=None):
         ''' Logging function fot this strategy'''
@@ -115,10 +115,15 @@ class SMAStrategy(bt.Strategy):
 
             # Not yet ... we MIGHT BUY if ...
             if self.buy_signal and self.trend_indicator[0] < 0.0:
-                self.log('BUY CREATE, %.2f' % self.dataclose[0])
+                if self.trend_indicator[0] < 0.0: size = self.p.stake * 1
+                if self.trend_indicator[0] < -0.2: size = self.p.stake * 2
+                if self.trend_indicator[0] < -0.4: size = self.p.stake * 4
+                if self.trend_indicator[0] < -0.6: size = self.p.stake * 6
+                if self.trend_indicator[0] < -0.8: size = self.p.stake * 8
+                self.log('BUY CREATE, %.2f, size: %.0f' % (self.dataclose[0], size))
 
                 # Keep track of the created order to avoid a 2nd order
-                self.order = self.buy()
+                self.order = self.buy(size=size)
 
         else:
 
@@ -126,7 +131,7 @@ class SMAStrategy(bt.Strategy):
                 self.log('SELL CREATE, %.2f' % self.dataclose[0])
 
                 # Keep track of the created order to avoid a 2nd order
-                self.order = self.sell()
+                self.order = self.close()
 
 
 if __name__ == '__main__':
