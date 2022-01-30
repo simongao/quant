@@ -16,8 +16,9 @@ class TrendIndicator(bt.Indicator):
                     plotname='',
                )  
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.addminperiod = max(self.p.ma_periods) + 1
+        super().__init__(*args, **kwargs)
 
     def next(self):
         smas = []
