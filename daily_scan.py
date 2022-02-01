@@ -227,6 +227,28 @@ def analyze_top_winners_losers(ignore_ST=True, ignore_IPO=True):
     return top_winners, top_losers
 
 def identify_opptunities(ignore_ST=True, ignore_IPO=True):
+    data = pd.read_csv('./data/20211001_20220131.csv')
+    data=data[['code','datetime','open','high','low','close','volumn','openinterest','name','area','industry','market','list_date']]
+    data.set_index(['code','datetime'], inplace=True)
+    CustomStrategy = ta.Strategy(
+        name="Momo and Volatility",
+        description="SMA 50,200, BBANDS, RSI, MACD and Volume SMA 20",
+        ta=[
+            {"kind": "sma", "length": 5},
+            {"kind": "sma", "length": 10},
+            {"kind": "sma", "length": 20},
+            {"kind": "sma", "length": 50},
+            {"kind": "sma", "length": 200},
+            {"kind": "bbands", "length": 20},
+            {"kind": "adx", "length":14},
+            {"kind": "macd", "fast": 8, "slow": 21},
+            {"kind": "dm", "length":6},
+        ]
+    )
+    data.ta.strategy(CustomStrategy)
+
+    dmi = data.query(f'DMP_6<10 or (ADX_14>25 and DMP_6>DMN_6)')
+
     return opptunities
 
 def generate_reports(*args, **kwargs):
