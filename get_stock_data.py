@@ -141,7 +141,7 @@ def get_stock_data(code, start_date, end_date, adj='qfq'):
     return data
 
 # 获取整个市场每日行情
-def get_daily(start_date='20180101', end_date='20211231', exchange='China', fp=None):
+def get_daily(start_date='20180101', end_date='20211231', exchange='SSE', fp=None, combined=True, adjusted=True):
     trade_cal = get_trade_cal(start_date=start_date, end_date=end_date)
     trade_cal.sort_values(by='cal_date', ascending=True, inplace=True)
     start_date = nearest_date(trade_cal['cal_date'], start_date, direction='foreward')
@@ -154,7 +154,7 @@ def get_daily(start_date='20180101', end_date='20211231', exchange='China', fp=N
     pro = get_pro()
     datas = pd.DataFrame()
     adj_factors = pd.DataFrame()
-    adj_datas = pd.DataFrame()
+    basics = pd.DataFrame()
     i = 0
     l = len(trade_dates)
     for trade_date in trade_dates:
@@ -174,29 +174,142 @@ def get_daily(start_date='20180101', end_date='20211231', exchange='China', fp=N
                 adj_factor.to_csv(fname2)
         adj_factors = pd.concat([adj_factors, adj_factor])
 
-        adj_data = pd.merge(data, adj_factor, on=['ts_code'], how='left', suffixes=('','_y'))
-        adj_data['adj_open'] = adj_data['open'] * adj_data['adj_factor']
-        adj_data['adj_high'] = adj_data['high'] * adj_data['adj_factor']
-        adj_data['adj_low'] = adj_data['low'] * adj_data['adj_factor']
-        adj_data['adj_close'] = adj_data['close'] * adj_data['adj_factor']
-        adj_datas = pd.concat([adj_datas, adj_data])
+        # 获取股票基本面信息
+        basic = pro.daily_basic(trade_date=trade_date)
+        if fp: # 存储到本地
+            fname3 = os.path.join(fp,'basic_'+trade_date+'.csv')
+            if not os.path.exists(fname3): 
+                basic.to_csv(fname3)
+        basics = pd.concat([basics, basic])
 
         i += 1
         progress_bar(i, l, prefix='Progress:', suffix='Complete', barLength=50)
 
-    adj_datas = adj_datas[['ts_code', 'trade_date', 'adj_open', 'adj_high', 'adj_low', 'adj_close', 'vol']]
-    adj_datas.columns = ['code', 'datetime', 'open', 'high', 'low', 'close', 'volumn']
-    adj_datas['datetime'] = pd.to_datetime(adj_datas['datetime'])
-    adj_datas.sort_values(by='datetime', ascending=True, inplace=True)
-    adj_datas.set_index(['code', 'datetime'], inplace=True)
-    adj_datas['openinterest'] = 0.0
-    adj_datas = adj_datas.dropna()
-    adj_datas = adj_datas.fillna(0)
+    print('下载完毕')
+
+    datas = datas[['ts_code', 'trade_date', 'open', 'high', 'low', 'close', 'vol']]
+    datas.columns = ['code', 'datetime', 'open', 'high', 'low', 'close', 'volumn']
+    # datas['datetime'] = pd.to_datetime(datas['datetime'])
+    datas.sort_values(by='datetime', ascending=True, inplace=True)
+    datas.set_index(['code', 'datetime'], inplace=True)
+    datas['openinterest'] = 0.0
+    datas = datas.dropna().fillna(0)
+
+    if adjusted: # 计算复权数据
+        adj_factors = adj_factors[['ts_code', 'trade_date', 'adj_factor']]
+        adj_factors.columns = ['code', 'datetime', 'adj_factor']
+        adj_factors.sort_values(by='datetime', ascending=True, inplace=True)
+        adj_factors.set_index(['code', 'datetime'], inplace=True)
+        last_adj_factor = adj_factors.groupby('code')['adj_factor'].last()
+        adj_factors['adj_factor'] = adj_factors['adj_factor'] / last_adj_factor
+
+        datas['open'] = datas['open'] * adj_factors['adj_factor']
+        datas['high'] = datas['high'] * adj_factors['adj_factor']
+        datas['low'] = datas['low'] * adj_factors['adj_factor']
+        datas['close'] = datas['close'] * adj_factors['adj_factor']
+        datas = datas.dropna().fillna(0)
+
+    datas.reset_index(inplace=True)
+    if combined: # 合并股票基本信息
+        # 获得股票基本信息
+        stock_basic = pro.stock_basic()
+        datas = pd.merge(datas, stock_basic, left_on=['code'], right_on=['ts_code'], how='left')
+
+    return datas
+
+# 从本地获取行情
+def get_daily_from_local(start_date='20180101', end_date='20211231', exchange='SSE', fp=None, combined=True, adjusted=True):
+    # 读取交易日历
+    if fp: # 本地文件
+        fname = os.path.join(fp,'trade_calendar.csv')
+        if not os.path.exists(fname):
+            print('文件不存在：%s' % fname) 
+        else:
+            trade_cal = pd.read_csv(fname)
+    
+    trade_cal.sort_values(by='cal_date', ascending=True, inplace=True)
+    # start_date = nearest_date(trade_cal['cal_date'], start_date, direction='foreward')
+    # end_date = nearest_date(trade_cal['cal_date'], end_date, direction='backward')
+    trade_cal['cal_date'] = pd.to_datetime(trade_cal['cal_date'], format="%Y%m%d")
+    trade_dates = trade_cal.query(f'cal_date>="{start_date}" and cal_date<="{end_date}" and is_open==1')
+    trade_dates = trade_dates['cal_date']
+
+    print('正在从本地加载每日行情数据...')
+
+    datas = pd.DataFrame()
+    adj_factors = pd.DataFrame()
+    basics = pd.DataFrame()
+    i = 0
+    l = len(trade_dates)
+    for trade_date in trade_dates:
+        trade_date = trade_date.strftime("%Y%m%d")
+        # 获取每日行情
+        if fp: # 本地文件
+            fname1 = os.path.join(fp,trade_date+'.csv')
+            if not os.path.exists(fname1):
+                print('文件不存在：%s' % fname1) 
+            else:
+                data = pd.read_csv(fname1)
+        datas = pd.concat([datas, data])
+        
+        # 获取除权系数
+        if fp: # 本地文件
+            fname2 = os.path.join(fp,'adj_factor_'+trade_date+'.csv')
+            if not os.path.exists(fname2): 
+                print('文件不存在：%s' % fname2) 
+            else:
+                adj_factor = pd.read_csv(fname2)
+        adj_factors = pd.concat([adj_factors, adj_factor])
+
+        # 获取股票基本面信息
+        if fp: # 本地文件
+            fname3 = os.path.join(fp,'basic_'+trade_date+'.csv')
+            if not os.path.exists(fname3): 
+                print('文件不存在：%s' % fname3)
+            else: 
+                basic = pd.read_csv(fname3)
+        basics = pd.concat([basics, basic])
+
+        i += 1
+        progress_bar(i, l, prefix='Progress:', suffix='Complete', barLength=50)
 
     print('下载完毕')
 
+    datas = datas[['ts_code', 'trade_date', 'open', 'high', 'low', 'close', 'vol']]
+    datas.columns = ['code', 'datetime', 'open', 'high', 'low', 'close', 'volumn']
+    # datas['datetime'] = pd.to_datetime(datas['datetime'])
+    datas.sort_values(by='datetime', ascending=True, inplace=True)
+    datas.set_index(['code', 'datetime'], inplace=True)
+    datas['openinterest'] = 0.0
+    datas = datas.dropna().fillna(0)
 
-    return adj_datas
+    if adjusted: # 计算复权数据
+        adj_factors = adj_factors[['ts_code', 'trade_date', 'adj_factor']]
+        adj_factors.columns = ['code', 'datetime', 'adj_factor']
+        adj_factors.sort_values(by='datetime', ascending=True, inplace=True)
+        adj_factors.set_index(['code', 'datetime'], inplace=True)
+        last_adj_factor = adj_factors.groupby('code')['adj_factor'].last()
+        adj_factors['adj_factor'] = adj_factors['adj_factor'] / last_adj_factor
+
+        datas['open'] = datas['open'] * adj_factors['adj_factor']
+        datas['high'] = datas['high'] * adj_factors['adj_factor']
+        datas['low'] = datas['low'] * adj_factors['adj_factor']
+        datas['close'] = datas['close'] * adj_factors['adj_factor']
+        datas = datas.dropna().fillna(0)
+
+    datas.reset_index(inplace=True)
+    if combined: # 合并股票基本信息
+        # 获得股票基本信息
+        # stock_basic = pro.stock_basic()
+        if fp: # 本地文件
+            fname4 = os.path.join(fp,'stock_basic.csv')
+            if not os.path.exists(fname4): 
+                print('文件不存在：%s' % fname4) 
+            else:
+                stock_basic = pd.read_csv(fname4)
+        datas = pd.merge(datas, stock_basic, left_on=['code'], right_on=['ts_code'], how='left')
+
+    return datas
 
 if __name__ == '__init__': 
     TOKEN_TUSHARE = os.environ.get('TOKEN_TUSHARE')
@@ -209,6 +322,7 @@ def get_args():
     parser.add_argument('--start_date', help='Start Date, example:20200301')
     parser.add_argument('--end_date', help='End Date, example:20201231')
     parser.add_argument('--fp', help='File Path Prefix for daily prices')
+    parser.add_argument('--from_local', help='Load data from local disk')
 
     return parser.parse_args()
 
@@ -220,7 +334,13 @@ if __name__ == '__main__':
         fname = os.path.join('.','data',args.code.replace('.','_')+'.csv')
         stock_data.to_csv(fname)
     else: # 整体市场行情
-        data = get_daily(start_date=args.start_date, end_date=args.end_date, fp=args.fp)
-        print(data)
-        fname = os.path.join('.','data',args.start_date+'_'+args.end_date+'.csv')
-        data.to_csv(fname)
+        if not args.from_local:
+            data = get_daily(start_date=args.start_date, end_date=args.end_date, fp=args.fp)
+            print(data)
+            fname = os.path.join('.','data',args.start_date+'_'+args.end_date+'.csv')
+            data.to_csv(fname)
+        else:
+            data = get_daily_from_local(start_date=args.start_date, end_date=args.end_date, fp=args.fp)
+            print(data)
+            fname = os.path.join('.','data',args.start_date+'_'+args.end_date+'.csv')
+            data.to_csv(fname)
