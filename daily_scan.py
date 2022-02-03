@@ -19,7 +19,7 @@ import pandas as pd
 import numpy as np
 import tushare as ts
 from datetime import datetime, timedelta
-import os
+import os, time
 import pandas_ta as ta
 
 settings = dict(
@@ -227,29 +227,72 @@ def analyze_top_winners_losers(ignore_ST=True, ignore_IPO=True):
     return top_winners, top_losers
 
 def identify_opptunities(ignore_ST=True, ignore_IPO=True):
-    data = pd.read_csv('./data/20211001_20220131.csv')
+    data = pd.read_csv('./Projects/quant/data/20211001_20220131.csv', dtype={'datetime':'str', 'list_date':'str'})
     data=data[['code','datetime','open','high','low','close','volumn','openinterest','name','area','industry','market','list_date']]
     data.set_index(['code','datetime'], inplace=True)
+    data.sort_index(inplace=True)
+
+    market = '主板'
+
+    if(market):
+        data = data[data['market'].str.contains('主板', na=False)]
+
+    if(ignore_ST):
+        data = data[~data['name'].str.contains('ST', na=False)]
+
+    if(ignore_IPO):
+        cutoff_date = (datetime.today()-timedelta(days=365)).strftime('%Y%m%d')
+        data = data[data['list_date'] < cutoff_date]
+
+    # 定义技术指标
     CustomStrategy = ta.Strategy(
         name="Momo and Volatility",
         description="SMA 50,200, BBANDS, RSI, MACD and Volume SMA 20",
         ta=[
-            {"kind": "sma", "length": 5},
-            {"kind": "sma", "length": 10},
-            {"kind": "sma", "length": 20},
-            {"kind": "sma", "length": 50},
-            {"kind": "sma", "length": 200},
-            {"kind": "bbands", "length": 20},
-            {"kind": "adx", "length":14},
-            {"kind": "macd", "fast": 8, "slow": 21},
-            {"kind": "dm", "length":6},
+                {"kind": "sma", "length": 5},
+                {"kind": "sma", "length": 10},
+                {"kind": "sma", "length": 20},
+                {"kind": "sma", "length": 60},
+                {"kind": "bbands", "length": 20, "std": 3},
+                {"kind": "adx", "length":14},
+                {"kind": "atr", "length":14},
+                {"kind": "macd", "fast": 8, "slow": 21},
         ]
     )
-    data.ta.strategy(CustomStrategy)
 
-    dmi = data.query(f'DMP_6<10 or (ADX_14>25 and DMP_6>DMN_6)')
+    # 小样本测试
+    # idx = pd.IndexSlice
+    # data = data.loc[idx['600001.SH':'600100.SH',:]].copy()
 
-    return opptunities
+    with pd.option_context('mode.chained_assignment', None):
+        start_time = time.time()
+        stocks = pd.DataFrame()
+        codes = df.index.get_level_values('code').unique()
+        for code in codes:
+            stock = df.loc[code]
+            stock['code'] = code
+            stock.ta.strategy(CustomStrategy)
+            stocks = pd.concat([stocks, stock])
+        end_time = time.time()
+        print('共处理%.0f个股票，总计耗时:%.2f 秒, 平均%.2f 秒' % (len(codes), (end_time - start_time), (end_time - start_time)/len(codes)))
+
+    stocks.reset_index(inplace=True)
+    stocks.sort_values(by='datetime', ascending=True, inplace=True)
+    last_two_trades = stocks.groupby('code').tail(2)
+    l1 = last_two_trades.groupby('code').first()
+    l2 = last_two_trades.groupby('code').last()
+
+    dmi_revert = l2[l2['DMP_14']<10]
+    dmi_revert.reset_index(inplace=True)
+    dmi_revert = dmi_revert[['code', 'name', 'datetime','ADX_14','DMP_14','DMN_14']]
+    print(dmi_revert)
+
+    dmi_trend = l2[(l2['ADX_14']>25) & (l1['DMP_14']<l1['DMN_14']) & (l2['DMP_14']>l2['DMN_14'])]
+    dmi_trend.reset_index(inplace=True)
+    dmi_trend = dmi_trend[['code', 'name', 'datetime','ADX_14','DMP_14','DMN_14']]
+    print(dmi_trend)
+
+    return [dmi_revert, dmi_trend]
 
 def generate_reports(*args, **kwargs):
     pass
