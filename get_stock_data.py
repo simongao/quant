@@ -130,7 +130,7 @@ def get_indexes(index_codes=[], trade_date=datetime.today().strftime('%Y%m%d')):
 def get_stock_data(code, start_date, end_date, adj='qfq'):
     data = ts.pro_bar(ts_code=code, asset='E', start_date=start_date, end_date=end_date, adj=adj)
     data = data[['trade_date', 'open', 'high', 'low', 'close', 'vol']]
-    data.columns = ['datetime', 'open', 'high', 'low', 'close', 'volumn']
+    data.columns = ['datetime', 'open', 'high', 'low', 'close', 'volume']
     data['datetime'] = pd.to_datetime(data['datetime'])
     data.set_index('datetime', inplace=True)
     data.sort_values(by='datetime', ascending=True, inplace=True)
@@ -188,7 +188,7 @@ def get_daily(start_date='20180101', end_date='20211231', exchange='SSE', fp=Non
     print('下载完毕')
 
     datas = datas[['ts_code', 'trade_date', 'open', 'high', 'low', 'close', 'vol']]
-    datas.columns = ['code', 'datetime', 'open', 'high', 'low', 'close', 'volumn']
+    datas.columns = ['code', 'datetime', 'open', 'high', 'low', 'close', 'volume']
     # datas['datetime'] = pd.to_datetime(datas['datetime'])
     datas.sort_values(by='datetime', ascending=True, inplace=True)
     datas.set_index(['code', 'datetime'], inplace=True)
@@ -225,12 +225,12 @@ def get_daily_from_local(start_date='20180101', end_date='20211231', exchange='S
         if not os.path.exists(fname):
             print('文件不存在：%s' % fname) 
         else:
-            trade_cal = pd.read_csv(fname)
+            trade_cal = pd.read_csv(fname, dtype={'cal_date':'str'})
     
     trade_cal.sort_values(by='cal_date', ascending=True, inplace=True)
     # start_date = nearest_date(trade_cal['cal_date'], start_date, direction='foreward')
     # end_date = nearest_date(trade_cal['cal_date'], end_date, direction='backward')
-    trade_cal['cal_date'] = pd.to_datetime(trade_cal['cal_date'], format="%Y%m%d")
+    # trade_cal['cal_date'] = pd.to_datetime(trade_cal['cal_date'], format="%Y%m%d")
     trade_dates = trade_cal.query(f'cal_date>="{start_date}" and cal_date<="{end_date}" and is_open==1')
     trade_dates = trade_dates['cal_date']
 
@@ -242,14 +242,14 @@ def get_daily_from_local(start_date='20180101', end_date='20211231', exchange='S
     i = 0
     l = len(trade_dates)
     for trade_date in trade_dates:
-        trade_date = trade_date.strftime("%Y%m%d")
+        # trade_date = trade_date.strftime("%Y%m%d")
         # 获取每日行情
         if fp: # 本地文件
             fname1 = os.path.join(fp,trade_date+'.csv')
             if not os.path.exists(fname1):
                 print('文件不存在：%s' % fname1) 
             else:
-                data = pd.read_csv(fname1)
+                data = pd.read_csv(fname1, dtype={'trade_date':'str'})
         datas = pd.concat([datas, data])
         
         # 获取除权系数
@@ -258,16 +258,16 @@ def get_daily_from_local(start_date='20180101', end_date='20211231', exchange='S
             if not os.path.exists(fname2): 
                 print('文件不存在：%s' % fname2) 
             else:
-                adj_factor = pd.read_csv(fname2)
+                adj_factor = pd.read_csv(fname2, dtype={'trade_date':'str'})
         adj_factors = pd.concat([adj_factors, adj_factor])
 
-        # 获取股票基本面信息
+        # 获取每日股票基本面信息
         if fp: # 本地文件
             fname3 = os.path.join(fp,'basic_'+trade_date+'.csv')
             if not os.path.exists(fname3): 
                 print('文件不存在：%s' % fname3)
             else: 
-                basic = pd.read_csv(fname3)
+                basic = pd.read_csv(fname3, dtype={'trade_date':'str'})
         basics = pd.concat([basics, basic])
 
         i += 1
@@ -276,7 +276,7 @@ def get_daily_from_local(start_date='20180101', end_date='20211231', exchange='S
     print('下载完毕')
 
     datas = datas[['ts_code', 'trade_date', 'open', 'high', 'low', 'close', 'vol']]
-    datas.columns = ['code', 'datetime', 'open', 'high', 'low', 'close', 'volumn']
+    datas.columns = ['code', 'datetime', 'open', 'high', 'low', 'close', 'volume']
     # datas['datetime'] = pd.to_datetime(datas['datetime'])
     datas.sort_values(by='datetime', ascending=True, inplace=True)
     datas.set_index(['code', 'datetime'], inplace=True)
@@ -306,7 +306,7 @@ def get_daily_from_local(start_date='20180101', end_date='20211231', exchange='S
             if not os.path.exists(fname4): 
                 print('文件不存在：%s' % fname4) 
             else:
-                stock_basic = pd.read_csv(fname4)
+                stock_basic = pd.read_csv(fname4, dtype={'list_date':'str'})
         datas = pd.merge(datas, stock_basic, left_on=['code'], right_on=['ts_code'], how='left')
 
     return datas
