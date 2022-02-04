@@ -1,0 +1,4 @@
+*.bat
+*.ipynb
+*.pyc
+result
