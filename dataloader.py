@@ -354,6 +354,48 @@ def filter_stock(dataset=None, method=None, n=None, watchlist=None, ignore_ST=Tr
 
     return data
 
+def calc_growth_from_local(start_date, end_date):
+    trade_cal = pd.read_csv('./data/daily/trade_calendar.csv', dtype={'cal_date':'str'})
+
+    trade_cal.sort_values(by='cal_date', ascending=True, inplace=True)
+    trade_dates = trade_cal.query(f'cal_date>="{start_date}" and cal_date<="{end_date}" and is_open==1')
+    trade_dates = trade_dates['cal_date']
+    start_date = trade_dates.iloc[0]
+    end_date = trade_dates.iloc[-1]
+
+    daily1 = pd.read_csv(f'./data/daily/{start_date}.csv', dtype={'trade_date':'str'})
+    daily2 = pd.read_csv(f'./data/daily/{end_date}.csv', dtype={'trade_date':'str'})
+
+    adj_factor1 = pd.read_csv(f'./data/daily/adj_factor_{start_date}.csv', dtype={'trade_date':'str'})
+    adj_factor2 = pd.read_csv(f'./data/daily/adj_factor_{end_date}.csv', dtype={'trade_date':'str'})
+
+    daily1 = pd.merge(daily1, adj_factor1, on=['ts_code'], how='left')
+    daily2 = pd.merge(daily2, adj_factor2, on=['ts_code'], how='left')
+
+    daily1['adj_price1'] = daily1['close'] * daily1['adj_factor']
+    daily2['adj_price2'] = daily2['close'] * daily2['adj_factor']
+
+    growth = pd.merge(daily1[['ts_code','adj_price1']], daily2[['ts_code','adj_price2']], on=['ts_code'], how='left', suffixes=('_1','_2'))
+
+    date1 = datetime.strptime(start_date,'%Y%m%d')
+    date2 = datetime.strptime(end_date,'%Y%m%d')
+    delta = (date2 - date1) 
+    delta_years = delta.days / 365.0 
+
+    growth['total_growth'] = growth['adj_price2'] / growth['adj_price1']
+
+    growth['annual_growth'] = np.round((np.power(10, np.log10(growth['total_growth']) / delta_years) - 1.0) * 100, 2)
+
+    growth.sort_values(by='annual_growth', ascending=False, inplace=True)
+
+    # 获得股票基本信息
+    stock_basic = pd.read_csv(f'./data/daily/stock_basic.csv', dtype={'list_date':'str'})
+    growth = pd.merge(growth, stock_basic, on=['ts_code'], how='left')
+
+    growth = growth.dropna()
+    
+    return growth
+
 if __name__ == '__init__': 
     TOKEN_TUSHARE = os.environ.get('TOKEN_TUSHARE')
     ts.set_token(TOKEN_TUSHARE)
