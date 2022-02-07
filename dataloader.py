@@ -9,7 +9,7 @@ Usage:
     python get_stock_data.py --start_date '20211001' --end_date '20211030' --fp './data/daily/'
 '''
 
-import os, sys
+import os, sys, time
 import argparse
 import numpy as np
 import pandas as pd

@@ -6,18 +6,18 @@ import argparse
 import numpy as np
 import dataloader
 import pandas as pd
-from buy_and_hold import BuyAndHoldStrategy
+from oversell import OversellStrategy
 
 strategy = dict(
-                name='Buy and Hold',
-                param='',
-                classname='BuyAndHoldStrategy',
+                name='Oversell',
+                param='Scan10_Hold15_TP',
+                classname='OversellStrategy',
             )
 
 class AllInOut(bt.Sizer):
     def _getsizing(self, comminfo, cash, data, isbuy):
         if (isbuy):
-            size = math.floor((cash / data.close[0] / 100)) * 100
+            size = math.floor((0.9 * cash / data.close[0] / 100)) * 100
         else:
             size = self.broker.getposition(data)
         return size
@@ -70,7 +70,7 @@ if __name__ == '__main__':
     fp = args.fp if args.fp else './data/daily/'
     method = args.scope if args.scope else 'RANDOM'
     dataset = dataloader.get_daily_from_local(start_date=start_date, end_date=end_date, fp=fp)
-    dataset = dataloader.filter_stock(dataset=dataset, method=method)
+    dataset = dataloader.filter_stock(dataset=dataset, method=method, n=100)
     dataset.sort_values(by='datetime', ascending=True, inplace=True)
 
     accumulated_pnl = 0.0
@@ -98,7 +98,8 @@ if __name__ == '__main__':
         cerebro.addsizer(AllInOut)
 
         # Set our desired cash start
-        cerebro.broker.set_cash(startcash)
+        cerebro.broker.setcash(startcash)
+        cerebro.broker.setcommission(0.00075)
 
         # Add analyzers
         cerebro.addanalyzer(bt.analyzers.SharpeRatio_A)
@@ -167,6 +168,7 @@ if __name__ == '__main__':
         summary_pvt = summary_pvt[['PnL', 'Trades', 'Wins', 'Win_Ratio', 'Losts', 'Lost_Ratio', 'Win_Value', 'Win_Avg', 'Win_Max', 'Lost_Value', 'Lost_Avg', 'Lost_Max']]
         summary_pvt = np.round(summary_pvt,2)
         print(summary_pvt)
-        summary_pvt.to_csv(f"./result/{strategy['name']}_{strategy['param']}.csv")
+        today = datetime.today().strftime('%Y%m%d')
+        summary_pvt.to_csv(f"./result/{strategy['name']}_{strategy['param']}_{method}_{today}.csv")
     t2 = time.time()
     print('共处理%.0f个股票，总计耗时:%.2f 秒, 平均%.2f 秒' % (len(stocks), (t2 - t1), (t2 - t1)/len(stocks)))
